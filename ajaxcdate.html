@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>fileUploader</title>
+    <style type="text/css">
+      .upbox{width: 100%;height: 500px;border: 3px dashed #000;position: relative;}
+      #uploader{display: block;width: 100%;height: 100%;opacity: 0;position: absolute;left: 0;top: 0;cursor: pointer;}
+      h1{position: absolute;left: 45%;top: 40%;}
+      button{width: 100px;height: 50px;float: right;}
+      .img-content{width: 120px;height: 120px;border: 1px solid #000;margin: 20px;float: left;position: relative; z-index: 5;}
+      #list .img-box{margin-right: 10px;border:1px dashed black;}
+      #list .img-big{float: left}
+      .success{
+        color:green;
+      }
+      .error{
+        color: red;
+      }
+    </style>
+</head>
+<body>
+    <div class="upbox">
+        <h1>测试</h1>
+        <input id="uploader" type="file" multiple="multiple" name="file" accept="image/*"> 
+        <!-- multiple:可接受多个值的文件上传字段;accept:图片格式的限制属性(全部属性用法:image/* 限制属性用法:accept="image/png",image/gif) -->
+        <div id="list"></div>
+    </div>    
+    <a id="test" href="">点击选择上传图片</a>
+    <button type="button" id="button">上传</button>
+    <div id="point"></div>
+    <script type="text/javascript">
+        var uploader=document.querySelectorAll('#uploader')[0]; 
+        // querySelectorAll:返回匹配选择器的指定组，该文件（使用文档的节点深度优先顺序预先遍历）内的元素的列表。 对象将返回战神NodeList 。
+        var filesLen,newFile;
+        var filesArray=[],newURL,fileDate=[];//fileDate存放压缩后的base64数据,filesArray存放压缩后的Blob 对象文件
+        var test=document.querySelectorAll('#test')[0];
+        var point = document.querySelector('#point'); // querySelector:第一个返回元素文档的范围内（前第一:使用该文档的深度秩序的遍历节点|由文档标记顺序的第一要素，并通过节点的节点的顺序由孩子的金额迭代）指定的组的匹配选择器
+        uploader.addEventListener('change',function (event) { // addEventListener:它被称为监听,文档本身，一个窗口，或支持事件的任何其他物体（如XMLHttpRequest的）。
+          var e=event||window.event; // 是我们在做事件处理时候区分IE和其他浏览器事件对象时常用的写法。
+          var target=e.target; // 引用调度该事件的对象
+          var files=target.files; // JavaScript 会返回选定的 File 对象的列表作为 FileList
+          filesLen=files.length;
+          for(let i=0;i<filesLen;i++){
+              var reader=new FileReader(); // 主要用于将文件内容读入内存，通过一系列异步接口，可以在主线程中访问本地文件。
+              //文件读取结束后要做的事
+              reader.onload=function (event) {
+                  //读取用户选择的文件
+                  var fileURL=event.target.result;
+                  createThumbnailFromUrl(uploader,fileURL);
+                  var canvas=document.createElement('canvas'); // createElement:要创建指定元素的类型的字符串
+                  var context=canvas.getContext('2d'); // 画布上的情况下，或为null如果不支持上下文标识符。
+                  // 创建image对象
+                  var image=new Image();//这里把fileURL赋值给src，就可以拿到用户选择的图片，此时可以获取到图片的宽高
+                  image.src=fileURL;
+                  image.onload=function () {
+                    //将长宽压缩一半
+                      canvas.width=image.width/2;
+                      canvas.height=image.height/2;
+                      context.drawImage(image,0,0,canvas.width,canvas.height); // drawImage:画布2D API的方法提供了不同的方式来绘制图像到画布上。
+                      newURL=canvas.toDataURL('image/jpeg',0.5); // 包含了类型参数（默认为PNG）指定格式的图像表示URI。 type 返回的图像是在96 dpi的分辨率。
+                      //添加压缩后的base64数据
+                      fileDate.push(newURL);
+                      //将压缩过后的base64转成二进制文件
+                      var binary = atob(newURL.split(',')[1]); // atob()函数用来解码一个已经被base-64编码过的数据
+                      //将每一个二进制编码转成Unicode 编码
+                      var array = [];
+                      for(var ii = 0; ii < binary.length; ii++) {
+                        array.push(binary.charCodeAt(ii)); // charCodeAt:方法可返回指定位置的字符的 Unicode 编码。这个返回值是 0 - 65535 之间的整数。
+                      }
+                      //将Unicode 编码转成Blob 对象
+                      newFile = new Blob([new Uint8Array(array)], {type: 'image/jpeg'});
+                      filesArray.push(newFile);
+                  } 
+              }
+              reader.readAsDataURL(files[i]); // 基于HTML5的可预览多图片Ajax上传
+          }
+      });
+      var button = document.querySelector('#button');
+        /*添加元素
+         * 1.使用fileDate则表示post base64数据
+         * 2.使用filesArray则表示使用普通文件上传(推荐使用,比base64文件小)
+        **/
+      button.onclick = function(){
+        point.innerText = '开始上传...';
+        upload({
+          url:'./cdate.php',
+          type:'post',
+          filesArray:filesArray,//注释
+          callback:function(data){
+            data = JSON.parse(data);
+            for(var j=0;j<data.length;j++){
+              console.log(data.j);
+              var p = document.createElement('p');
+               p.innerText = data[j].msg;
+              if(data[j].code == 200){
+                p.classList.add('success');
+              }else{
+                p.classList.add('error');
+              }
+              point.appendChild(p);
+            }
+          },
+          uploading:function(data){
+            point.innerText = '当前上传进度为' + data + '%';
+          }
+        });
+      }
+    //创建缩略图样式
+      function createThumbnailFromUrl(context,fileURL) {
+           //创建元素
+           var img=document.createElement('img');
+           var imgBox=document.createElement('span');
+           imgBox.classList.add('img-big');
+           imgBox.appendChild(img);
+           
+           img.classList.add('img-box');
+           var list = document.querySelector('#list');
+           //动态插入创建的元素 
+           list.appendChild(imgBox);
+           //创建canvas重绘缩略图    
+           var canvas=document.createElement('canvas');
+           var context=canvas.getContext('2d'); 
+           // 创建image对象
+           var image=new Image();
+           image.src=fileURL;
+           image.onload=function () {
+              canvas.height = 120;
+              canvas.width = 120*image.width/image.height;
+              context.drawImage(image,0,0,canvas.width,canvas.height);
+              img.src=canvas.toDataURL('image/png',0.5); 
+           }
+      }
+      //文件上传
+      function upload(option){
+        var formData = new FormData(); // 通过JavaScript用一些键值对来模拟一系列表单控件,可以异步上传一个二进制文件
+        var xmlHttpRequest = new XMLHttpRequest(); // ajax实例化
+        for(var k=0;k<option.filesArray.length;k++){
+          formData.append('file'+k,option.filesArray[k]);
+        }
+        xmlHttpRequest.open(option.type, option.url);
+        xmlHttpRequest.onreadystatechange = function(){ // onreadystatechange事件:当请求被发送到服务器时，我们需要执行一些基于响应的任务。
+            if(xmlHttpRequest.status == 200){
+                if(xmlHttpRequest.readyState == 4){ // 存有 XMLHttpRequest 的状态。从 0 到 4 发生变化。
+                  if(option.callback instanceof Function){
+                        option.callback(xmlHttpRequest.responseText);
+                  }
+                }
+            }else{
+                alert("上传失败！");
+            }
+        }
+        xmlHttpRequest.upload.onprogress = function(event){ // onprogress:是当XMLHttpRequest成功完成之前定期调用信息的函数。
+            var pre = Math.floor(100 * event.loaded / event.total);
+            if(option.uploading instanceof Function){
+                option.uploading(pre);
+            }
+        }
+        xmlHttpRequest.send(formData);
+      }
+    </script>
+</body>
+</html>
